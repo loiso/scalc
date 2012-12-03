@@ -1,0 +1,48 @@
+program		: list_expr EOF
+		;
+
+list_expr	: add_expr '\n' 			list_expr
+				{ pop(); print(res) }
+		| '\n' list_expr
+		| empty
+		;
+		
+add_expr	: mul_expr rest_add_expr
+		;
+
+rest_add_expr	: '+' mul_expr			rest_add_expr
+				{ t1 = pop();
+				  t2 = pop();
+				  res = t1+t2;
+				  push(res);
+				}
+		| '-' mul_expr			rest_add_expr
+				{ t2 = pop();
+				  t1 = pop();
+				  res = t1-t2;
+				  push(res);
+				}
+		| empty
+		;
+		
+mul_expr	: pr_expr rest_mul_expr;
+
+rest_mul_expr	: '*' pr_expr 			rest_mul_expr
+				{ t1 = pop();
+				  t2 = pop();
+				  res = t1*t2;
+				  push(res);
+				}
+		| '/' pr_expr			rest_mul_expr
+				{ t2 = pop();
+				  t1 = pop();
+				  res = t1/t2;
+				  push(res);
+				}
+		| empty
+		;
+		
+pr_expr		: INTEGER 
+			  { push(integer) }
+		| '(' add_expr ')'
+		;
