@@ -28,11 +28,11 @@ pr_expr(void)
 		add_expr();
 		
 		if (err == 1) {
-			goto err;
+			goto out;
 		}
 		if (token.type != TOKEN_RPARENTH) {
 			err = 1;
-			goto err;
+			goto out;
 		} else {
 			get_next_token();
 		}
@@ -41,7 +41,7 @@ pr_expr(void)
 	case TOKEN_INTEGER:
 		val = malloc(sizeof(*val));
 		if (val == NULL)
-			goto err;
+			goto out;
 		
 		*val = token.value;		
 		push_item(&sp, (void *)val);
@@ -50,10 +50,8 @@ pr_expr(void)
 		
 	default:
 		err = 1;
-		goto err;
+		goto out;
 	}
-err:
-	printf("error\n");
 out:
 	return ;
 }
@@ -101,16 +99,14 @@ mul_expr(void)
 	case TOKEN_LPARENTH:
 		pr_expr();
 		if (err == 1) {
-			goto err;
+			goto out;
 		}
 		rest_mul_expr();
 		goto out;
 	default:
 		err = 1;
-		goto err;
+		goto out;
 	}
-err:
-	printf("error\n");
 out:
 	return ;
 }
@@ -157,16 +153,14 @@ add_expr(void)
 	case TOKEN_LPARENTH:
 		mul_expr();
 		if (err == 1) {
-			goto err;
+			goto out;
 		}
 		rest_add_expr();
 		goto out;		
 	default:
 		err = 1;
-		goto err;
+		goto out;
 	}
-err:
-	printf("error\n");
 out:
 	return ;
 }
@@ -176,14 +170,9 @@ list_expr(void)
 {	
 	int *c;
 	
-	if (err == 1) {
-		sync_stream();
-		sp.n = 0;
-		err = 0;
-		printf("syntax error\n");
-	}
-again:
+start:
 	while (token.type == TOKEN_INTEGER ||token.type == TOKEN_LPARENTH || token.type == TOKEN_EOL) {
+
 		if (token.type == TOKEN_EOL) {
 			get_next_token();
 			continue;
@@ -192,12 +181,21 @@ again:
 			return ;
 		}		
 		add_expr();
+
+		if (err == 1) {
+			printf("syntax error\n");
+			sync_stream();
+			sp.n = 0;
+			err = 0;
+			goto start;
+		}
 		c = (int *)pop_item(&sp);
 		printf("%i\n", (*c));		
 	}
-	
+
+	printf("syntax error\n");
 	sync_stream();
-	goto again;
+	goto start;
 }
 
 void
@@ -215,6 +213,7 @@ parse(void)
 static void 
 sync_stream(void) 
 {
-	while (token.type != TOKEN_EOL || token.type != TOKEN_EOF)
+	while ((token.type != TOKEN_EOL) && (token.type != TOKEN_EOF)) {
 		get_next_token();
+	}
 }
