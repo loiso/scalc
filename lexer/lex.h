@@ -4,6 +4,13 @@
 
 #ifndef LEX_H
 #define LEX_H
+ 
+#include <stdio.h>
+#include <stdint.h>
+#include "mpl.h"
+
+#define SIZE 	128
+#define NOMEM 	-1
 
 typedef enum token_t {
 	TOKEN_PLUS,
@@ -20,7 +27,7 @@ typedef enum token_t {
 
 struct token {	
 	token_t type;
-	int value;
+	mpl_int value;
 };
 
 extern struct token token;
