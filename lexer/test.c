@@ -1,10 +1,17 @@
 #include <stdio.h>
+#include <stdint.h>
+#include "mpl.h"
 
 #include "lex.h"
 
 int
-main (int argc, char **argv)
+main(int argc, char **argv)
 {	
+	char str[128];
+	int i;
+	
+	mpl_init(&token.value);
+	
 	do {
 		get_next_token();
 		switch(token.type) {
@@ -27,7 +34,11 @@ main (int argc, char **argv)
 			printf(")\n");
 			break;
 		case TOKEN_INTEGER:
-			printf("INTEGER: %d\n", token.value);
+			printf("INTEGER ");
+			mpl_to_str(&token.value, str, 10, 128);
+			for (i = 0; str[i] != '\0'; i++)
+				printf("%c", str[i]);
+			printf("\n");
 			break;
 		case TOKEN_INVALID:
 			printf("INVALID\n");
@@ -44,4 +55,3 @@ main (int argc, char **argv)
 	
 	return 0;
 }
-
