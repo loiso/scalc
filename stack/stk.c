@@ -1,54 +1,51 @@
-#include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <mpl.h>
 
-#include "stk.h"
+#include "stk_mpl.h"
 
-void
-stack_init(struct stack *sp)
+int
+stk_init(struct stack *sp)
 {
-	if (sp != NULL) {
-		sp->n = 0;
-	}
+	sp->n = 0;
+	return OK;
 }
 
 int
-push_item(struct stack *sp, void *val)
+push_item(struct stack *sp, mpl_int *value) 
 {
-	if (sp == NULL)
-		return NO_STACK;
-	
-	if (sp->n <= STACK_SIZE) {
-		sp->arr[sp->n] = val;
+	if (sp->n < SIZE) {
+		mpl_copy(&sp->stack[sp->n], value);
 		sp->n++;
 		return OK;
 	} else {
 		return OVERFLOW;
 	}
 }
-void *
-pop_item(struct stack *sp)
-{	
-	if (sp != NULL) {
-		sp->n--;	
-		return sp->arr[sp->n];
-	} else {
-		return NO_STACK;
-	}
+
+int
+pop_item(struct stack *sp, mpl_int *buf)
+{
+	if (sp->n >= SIZE)
+		return OVERFLOW;
+		
+	sp->n -= 1;
+	*buf = sp->stack[sp->n];
+	
+	return OK;
 }
 
 void
-print_stk(struct stack *sp) 
-{	
-	int *value;
-	int len;
+print_stk(struct stack *sp)
+{
+	char str[SIZE];
+	int i, j;
 	
-	len = sp->n;
-	sp->n--;
-	while (sp->n != -1) {
-		value = (int *)sp->arr[sp->n];
-		printf("stk %i, %i\n", (*value), sp->n);
-		sp->n--;
+	for (i = 0; i < sp->n; i++) {
+		mpl_to_str(&sp->stack[i], str, 10, SIZE);
+		for (j = 0; str[j] != '\0'; j++)
+			printf("%c", str[j]);
+		printf("\n");
 	}
-	sp->n = len;
 }
