@@ -4,24 +4,24 @@
 #include <stdint.h>
 
 #include "mpl.h"
-
 #include "lex.h"
 
 struct token token;
 static int buf = ' ';
-
 static char *array;
 
 token_t
 get_next_token()
+
 {	
 	int i = 0;
+	int pos = 0;
 	char *tmp;
 
 	array = malloc(SIZE * sizeof(char));
 	if (array == NULL)
 		return NOMEM;
-	
+
 	while (isblank(buf))
 		buf = getchar();
 	
@@ -37,22 +37,39 @@ get_next_token()
 	case '8':
 	case '9':
 		token.type = TOKEN_INTEGER;
+
 		do {
 			if (array[i] >= SIZE) {
 				tmp = realloc(array, SIZE * sizeof(char));
 				if (tmp == NULL) 
 					return NOMEM;
+
 				array = tmp;
 			}
+
+			if (pos != 0 && buf == '.')
+				goto invalid;
+	
+			if (buf == '.') {
+				pos = i;
+				buf = getchar();
+			}
+
 			array[i] = buf;
 			i++;
 			buf = getchar();
-		} while (isdigit(buf));
+
+		} while (isdigit(buf) || buf == '.');
 		
 		array[i] = '\0';
-	
-		mpl_set_str(&token.value, array, 10);
-		
+
+		if (pos != 0) {
+			token.num.frac = i - pos;
+		} else {
+			token.num.frac = 0;	
+		}	
+
+		mpl_set_str(&token.num.value, array, 10);
 		goto out;
 	case '+':
 		token.type = TOKEN_PLUS;
@@ -79,12 +96,11 @@ get_next_token()
 		token.type = TOKEN_EOF;
 		goto clean_out;
 	}
-	
+
+invalid:
 	token.type = TOKEN_INVALID;
-	
 clean_out:
 	buf = ' ';	
 out:
 	return token.type;
 }
-
