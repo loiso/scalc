@@ -1,14 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "mpl.h"
 #include "lex.h"
 #include "syntax.h"
-#include "stk_mpl.h"
+#include "stk.h"
 
-#define SYN_ERR 1
-#define MEM_ERR 2
+#define PRECISION	10
+#define SYN_ERR		1
+#define MEM_ERR		2
 
 static void	pr_expr(void);
 static void	rest_mul_expr(void);
@@ -17,6 +19,8 @@ static void	rest_add_expr(void);
 static void	add_expr(void);
 static void	list_expr(void);
 static void	sync_stream(void);
+static void	print_value(number buf);
+
 
 static unsigned int err;
 
@@ -25,10 +29,10 @@ struct stack sp;
 static void
 pr_expr(void)
 {
-	mpl_int val;
+	number val;
 	int rv;
 	
-	rv = mpl_init(&val);
+	rv = mpl_init(&val.value);
 	if (rv != MPL_OK){
 		err = MEM_ERR;
 		goto out;
@@ -52,7 +56,8 @@ pr_expr(void)
 		goto out;
 		
 	case TOKEN_INTEGER:
-		rv = mpl_copy(&val, &token.value);
+		rv = mpl_copy(&val.value, &token.num.value);
+		val.frac = token.num.frac;
 		if (rv != MPL_OK)
 			goto err;
 			
@@ -76,36 +81,54 @@ out:
 static void
 rest_mul_expr(void)
 {
-	int tmp;
-	int rv;
-	mpl_int op1, op2;
+	int tmp, rv, i;
+	number op1, op2;
 		
 	while(token.type == TOKEN_ASTERISK || token.type == TOKEN_SLASH) {	
 		tmp = token.type;
 		get_next_token();
-		pr_expr();
 		
+		pr_expr();
 		if (err == SYN_ERR) {
 			goto out;
 		}
+		
 		rv = pop_item(&sp, &op2);
 		if (rv != OK) {
 			err = MEM_ERR;
 			goto out;
 		}
+		
 		rv = pop_item(&sp, &op1);
 		if (rv != OK) {
 			err = MEM_ERR;
 			goto out;
 		}
+		
 		if (tmp == TOKEN_ASTERISK) {
-			rv = mpl_mul(&op1, &op1, &op2);
+			rv = mpl_mul(&op1.value, &op1.value, &op2.value);
 			if (rv != MPL_OK) {
 				err = MEM_ERR; 
 				goto out;
 			}
+			
+			op1.frac += op2.frac;
+
 		} else if (tmp == TOKEN_SLASH) {
-			rv = mpl_div(&op1, NULL, &op1, &op2);
+			if (op1.frac == 0 && op2.frac == 0)
+				goto main_part;
+				
+			op1.frac -= op2.frac;
+			for (i = 0; i < PRECISION; i++) {
+				rv = mpl_mul_dig(&op1.value, &op1.value, 10);
+				if (rv != MPL_OK) {
+					err = MEM_ERR;
+					goto out;
+				}
+				op1.frac++;
+			}
+main_part:			
+			rv = mpl_div(&op1.value, NULL, &op1.value, &op2.value);
 			if (rv != MPL_OK) {
 				err = MEM_ERR;
 				goto out;
@@ -116,7 +139,7 @@ rest_mul_expr(void)
 			err = MEM_ERR;
 			goto out;
 		}
-		mpl_clear(&op2);			
+		mpl_clear(&op2.value);			
 	}
 	
 	if (token.type != TOKEN_PLUS && token.type != TOKEN_MINUS &&
@@ -152,8 +175,8 @@ out:
 static void
 rest_add_expr(void)
 {
-	mpl_int op1, op2;
-	int tmp, rv;
+	number op1, op2;
+	unsigned int tmp, rv, i;
 		
 	while (token.type == TOKEN_PLUS || token.type == TOKEN_MINUS) {
 		tmp = token.type;
@@ -169,19 +192,43 @@ rest_add_expr(void)
 			err = MEM_ERR;
 			goto out;
 		}
+		
 		rv = pop_item(&sp, &op1);
 		if (rv != OK) {
 			err = MEM_ERR;
 			goto out;
 		}
+		
+		if (op1.frac == op2.frac)
+			goto main_part;
+			
+		if (op1.frac > op2.frac) {
+			for (i = 0; i < (op1.frac - op2.frac); i++)
+				rv = mpl_mul_dig(&op2.value, &op2.value, 10);
+				if (rv != MPL_OK) {
+					err = MEM_ERR;
+					goto out;
+				}
+			op2.frac = op1.frac;
+		} else {
+			for (i = 0; i < (op2.frac - op1.frac); i++)
+				rv = mpl_mul_dig(&op1.value, &op1.value, 10);
+				if (rv != MPL_OK) {
+					err = MEM_ERR;
+					goto out;
+				}
+			op1.frac = op2.frac;
+		}
+main_part:
 		if (tmp == TOKEN_PLUS) {
-			rv = mpl_add(&op1, &op1, &op2);
+			rv = mpl_add(&op1.value, &op1.value, &op2.value);
 			if (rv != MPL_OK) {
 				err = MEM_ERR;
 				goto out;
 			}
+
 		} else if (tmp == TOKEN_MINUS) {
-			rv = mpl_sub(&op1, &op1, &op2);
+			rv = mpl_sub(&op1.value, &op1.value, &op2.value);
 			if (rv != MPL_OK) {
 				err = MEM_ERR;
 				goto out;
@@ -192,7 +239,8 @@ rest_add_expr(void)
 			err = MEM_ERR;
 			goto out;
 		}
-		mpl_clear(&op2);
+		
+		mpl_clear(&op2.value);
 	}
 	
 	if (token.type != TOKEN_EOL && token.type != TOKEN_RPARENTH) {
@@ -226,11 +274,10 @@ out:
 static void
 list_expr(void)
 {	
-	char str[SIZE];
-	mpl_int c;
+	number res;
 		
 start:
-	while (token.type == TOKEN_INTEGER ||token.type == TOKEN_LPARENTH || token.type == TOKEN_EOL) {
+	while (token.type == TOKEN_INTEGER ||token.type == TOKEN_LPARENTH || token.type == TOKEN_EOL || token.type == TOKEN_EOF) {
 
 		if (token.type == TOKEN_EOL) {
 			get_next_token();
@@ -251,9 +298,8 @@ start:
 			err = 0;
 			goto start;
 		}
-		pop_item(&sp, &c);
-		mpl_to_str(&c, str, 10, SIZE);
-		printf("%s\n", str);
+		pop_item(&sp, &res);
+		print_value(res);
 	}
 
 	printf("syntax error\n");
@@ -269,7 +315,7 @@ parse(void)
 	stk_init(&sp);
 	err = 0;
 	
-	rv = mpl_init(&token.value);
+	rv = mpl_init(&token.num.value);
 	if (rv != MPL_OK) {
 		printf("memory error\n");
 		return ;
@@ -285,4 +331,41 @@ sync_stream(void)
 	while ((token.type != TOKEN_EOL) && (token.type != TOKEN_EOF)) {
 		get_next_token();
 	}
+}
+
+static void
+print_value(number buf)
+{
+	char str[SIZE];
+	int i, ind, len, rv;
+	
+	rv = mpl_to_str(&buf.value, str, 10, SIZE);
+	if (rv != MPL_OK) {
+		printf("memory error\n");
+		return ;
+	}
+
+	if (buf.frac == 0) {
+		printf("%s\n", str);
+		return ;
+	}
+	
+	len = strlen(str);
+	if (len <= buf.frac) {
+		printf("0,");
+		i = buf.frac - len;
+		while(i > 0) {
+			printf("0");
+			i--;
+		}
+		printf("%s\n", str);
+		return ;
+	}
+	
+	ind = len - buf.frac;
+	for (i = len; i >= ind; i--) {
+		str[i+1] = str[i];
+	}
+	str[ind] = '.';
+	printf("%s\n", str);
 }
