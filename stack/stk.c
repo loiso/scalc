@@ -1,9 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <mpl.h>
 
-#include "stk_mpl.h"
+#include "lex.h"
+#include "mpl.h"
+#include "stk.h"
 
 int
 stk_init(struct stack *sp)
@@ -13,10 +14,11 @@ stk_init(struct stack *sp)
 }
 
 int
-push_item(struct stack *sp, mpl_int *value) 
+push_item(struct stack *sp, number *buf) 
 {
 	if (sp->n < SIZE) {
-		mpl_copy(&sp->stack[sp->n], value);
+		mpl_copy(&sp->stack[sp->n].value, &buf->value);
+		sp->stack[sp->n].frac = buf->frac;
 		sp->n++;
 		return OK;
 	} else {
@@ -25,7 +27,7 @@ push_item(struct stack *sp, mpl_int *value)
 }
 
 int
-pop_item(struct stack *sp, mpl_int *buf)
+pop_item(struct stack *sp, number *buf)
 {
 	if (sp->n >= SIZE)
 		return OVERFLOW;
@@ -43,7 +45,7 @@ print_stk(struct stack *sp)
 	int i, j;
 	
 	for (i = 0; i < sp->n; i++) {
-		mpl_to_str(&sp->stack[i], str, 10, SIZE);
+		mpl_to_str(&sp->stack[i].value, str, 10, SIZE);
 		for (j = 0; str[j] != '\0'; j++)
 			printf("%c", str[j]);
 		printf("\n");
