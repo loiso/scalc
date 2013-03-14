@@ -25,9 +25,14 @@ typedef enum token_t {
 	TOKEN_EOF
 } token_t;
 
+typedef struct number {
+	int frac;
+	mpl_int value;
+} number;
+
 struct token {	
 	token_t type;
-	mpl_int value;
+	number num;
 };
 
 extern struct token token;
@@ -35,4 +40,3 @@ extern struct token token;
 token_t get_next_token();
 
 #endif /* LEX_H */
-
